@@ -1,0 +1,12 @@
+# Roboflow "crowd counting dataset" v2 (CC BY 4.0), exported in YOLO v5 PyTorch format
+# https://universe.roboflow.com/crowd-dataset/crowd-counting-dataset-w3o7w/dataset/2
+# Unzip the export into ./yolo_test so the paths below resolve (run from the repository root):
+#   yolo_test/{train,valid,test}/{images,labels}
+# Train: python train.py --data data/crowd.yaml --cfg models/yolo_crowd.yaml --weights yolov5s.pt --img 416
+
+train: ./yolo_test/train/images  # 2285 images
+val: ./yolo_test/valid/images  # 382 images
+test: ./yolo_test/test/images  # 231 images
+
+nc: 1  # number of classes
+names: ['people']  # one box per visible face / head
