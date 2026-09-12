@@ -18,6 +18,11 @@ from utils.torch_utils import select_device, load_classifier, time_synchronized
 from scipy.ndimage import maximum_filter
 from scipy.ndimage import label
 
+# ImageNet statistics CSRNet was trained with (RGB, native resolution, no letterboxing)
+CSRNET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+CSRNET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+
+
 # CSRNet Model for dense mode
 class CSRNet(nn.Module):
     def __init__(self):
@@ -168,20 +173,23 @@ def detect(save_img=False):
 
         else:
             # Dense mode (CSRNet)
-            density_map = model(img).detach()
-            t2 = time_synchronized()
-            print(f'Done. ({t2 - t1:.3f}s)')
-
             for i, im0 in enumerate(im0s if isinstance(im0s, list) else [im0s]):
                 p = Path(path[i] if isinstance(path, list) else path)
                 save_path = str(save_dir / p.name)
-                
-                # Get density map
-                if density_map.shape[0] > i:
-                    density = density_map[i].cpu().numpy().squeeze()
-                else:
-                    density = density_map[0].cpu().numpy().squeeze()
-                
+
+                # CSRNet was trained on ImageNet-normalized RGB images at native
+                # resolution. Reusing the letterboxed/unnormalized YOLO tensor here
+                # (as before) starves it of the input distribution it expects and
+                # tanks its accuracy relative to the detection models.
+                rgb = (im0[:, :, ::-1].astype(np.float32) / 255.0 - CSRNET_MEAN) / CSRNET_STD
+                csrnet_input = torch.from_numpy(rgb.transpose(2, 0, 1).copy()).unsqueeze(0).to(device)
+                csrnet_input = csrnet_input.half() if half else csrnet_input.float()
+                density_map = model(csrnet_input).detach()
+                t2 = time_synchronized()
+                print(f'Done. ({t2 - t1:.3f}s)')
+
+                density = density_map[0].cpu().numpy().squeeze()
+
                 crowd_count = int(np.sum(density))
                 
                 # Resize density map to match original image size
